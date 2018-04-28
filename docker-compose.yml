@@ -1,0 +1,56 @@
+version: '3'
+services:
+  consul1:
+    image: "consul:latest"
+    container_name: "consul1"
+    hostname: "consul1"
+    ports:
+      - "8301:8301"
+      - "8400:8400"
+      - "8500:8500"
+      - "8600:53"
+    command: "agent -server -client=0.0.0.0 -bootstrap -ui -ui-dir /ui"
+  consul2:
+    image: "consul:latest"
+    container_name: "consul2"
+    hostname: "consul2"
+    command: "agent -server -join consul1 -client=0.0.0.0"
+    depends_on:
+      - consul1
+  consul3:
+    image: "consul:latest"
+    container_name: "consul3"
+    hostname: "consul3"
+    command: "agent -server -join consul1 -client=0.0.0.0"
+    depends_on:
+      - consul1
+  vault1:
+    image: vault:latest
+    container_name: "vault1"
+    hostname: "vault1"
+    build:
+      context: .
+      dockerfile: vault/Dockerfile
+    cap_add: 
+      - IPC_LOCK
+    ports:
+      - "8200:8200"
+    command: "server"
+    environment:
+      - 'VAULT_LOCAL_CONFIG={"listener":{ "tcp":{ "address": "0.0.0.0:8200", "tls_disable": "1" }}, "backend": {"consul": {"path": "vault/", "address": "consul1:8500", "scheme": "http"}}, "ui": "true", "default_lease_ttl": "168h", "max_lease_ttl": "720h"}'
+    depends_on:
+      - consul1
+      - consul2
+  vault2:
+    image: vault:latest
+    container_name: "vault2"
+    hostname: "vault2"
+    cap_add: 
+      - IPC_LOCK
+    ports:
+      - "8201:8200"
+    command: "server"
+    environment:
+      - 'VAULT_LOCAL_CONFIG={"listener":{ "tcp":{ "address": "0.0.0.0:8200", "tls_disable": "1" }}, "backend": {"consul": {"path": "vault/", "address": "consul1:8500", "scheme": "http"}}, "ui": "true", "default_lease_ttl": "168h", "max_lease_ttl": "720h"}'
+    depends_on:
+      - vault1
